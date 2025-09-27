@@ -1,0 +1,150 @@
+# Exploratory Data Analysis for dataset containing Lung Cancer associated SNPs from GWAS Catalog
+
+Dataset can be found here - [Link](https://www.ebi.ac.uk/gwas/efotraits/MONDO_0008903)
+
+## Citations
+
+1. Sollis E, Mosaku A, Abid A, Buniello A, Cerezo M, Gil L, Groza T, Güneş O, Hall P, Hayhurst J, Ibrahim A, Ji Y, John S, Lewis E, MacArthur JAL, McMahon A, Osumi-Sutherland D, Panoutsopoulou K, Pendlington Z, Ramachandran S, Stefancsik R, Stewart J, Whetzel P, Wilson R, Hindorff L, Cunningham F, Lambert SA, Inouye M, Parkinson H, Harris LW. The NHGRI-EBI GWAS Catalog: knowledgebase and deposition resource. Nucleic Acids Res. 2023 Jan 6;51(D1):D977-D985. doi: 10.1093/nar/gkac1010. PMID: 36350656; PMCID: PMC9825413.
+
+1. Chen, C., Liu, Y., Luo, M., Yang, J., Chen, Y., Wang, R., Zhou, J., Zang, Y., Diao, L., & Han, L. (2024). PancanQTLv2.0: a comprehensive resource for expression quantitative trait loci across human cancers. Nucleic acids research, 52(D1), D1400–D1406. https://doi.org/10.1093/nar/gkad916
+
+# Appendix
+
+1.  [Introduction](#dataset-introduction)
+2.  [Justification](#dataset-justification)
+3.  [Research Question](#research-question)
+4.  [Data Wrangling](#data-pre-processing-and-cleanup)
+5.  [Exploratory Data Analysis](#exploratory-data-analysis)
+6.  [Statistical methods](#planned-statistical-methods)
+7.  [Limitations](#limitations)
+8.  [Variable Description](#variable-description)
+
+# Dataset Introduction {#dataset-introduction}
+
+The dataset contains information about Single Nucleotide Polymorphisms (SNPs) associated with lung cancer sourced from the GWAS dataset. Each record within the dataset corresponds to a SNP reported in a published scientific literature and is reported to have a statistical link to lung cancer susceptibility or outcomes. The dataset includes key features such as SNP ID, the chromosome where the SNP is located at and its exact position in the chromosome, the significance of the SNP is captured through p-values, odds ratio which represents the probability of the said SNP to occur. Altogether, this dataset proves to be comprehensive resource for exploring genetic risk factors underlying lung cancer.
+
+# Dataset Justification {#dataset-justification}
+
+We chose this dataset as we acknowledge that lung cancer remains to be one of the leading cause of death in the world and understanding about the underlying risk factors that cause this fatal disease can help us understand the mechanism of the cancer and develop targeted therapies to prevent it. GWAS Catalog is a well-established knowledge resource for studying these risk factors that combines categorical columns such as SNP ID, Gene Name, ancestry as well as numerical variables such as p-values, odds ratio, and sample sizes. This makes the dataset a flexible option for numerical and categorical analysis. Its biomedical association, rich annotation, and potential to explore genetic risk factors make it a strong candidate for meaningful analysis.
+
+# Research Question {#research-question}
+
+We plan to use the data from GWAS to perform eQTL analysis. eQTL or Expression Quantitative Trait Loci are genomic loci (positions) within the genome that influence gene expression levels. There are 2 types of eQTLs: cis-eQTLs are SNPs which occur within close proximity of a gene thereby controlling the gene expression by possibly altering the region where a transcription factor binds for gene expression. The second type is trans-eQTLs are SNPs which are located anywhere within the human genome, even on a different chromosome. These eQTLs are much harder to identify and often act together with other trans-eQTLs in coordinating gene expression. We would be using this dataset to identify potential eQTLs based on constraints such as p-value less than 5E-8, the proximity of the SNP to the gene etc. After identifying potential eQTLs for Lung Cancer, we would be comparing them against SNPs recorded in the established eQTL database for cancer [PancanQTL](#citations)
+
+# Data Pre-processing and cleanup {#data-pre-processing-and-cleanup}
+
+We found that the dataset contained a lot of NR values in the Risk Allele Frequency column which we plan to convert to NA values as they are not important because the column is actually numerical. We found dirty values within chromosome ID column which we plan to standardize to integers between 1 and 22, as well as X, Y, and MT. We found that certain numerical columns in the dataset that was misinterpreted to be string, which we would handling using as.integer or other similar functions for the other misinterpreted columns. We would also be checking for duplicate SNP IDs to maintain the uniqueness of each SNP.
+
+# Planned Statistical Methods
+
+We could possibly implement classical model such as `linear regression` to understand the relationships between Expression which could be obtained from [GEO](https://www.ncbi.nlm.nih.gov/geo/) (Gene Expression Omnibus) and Genotype which is the SNP that could be integrated using the existing R package `MatrixEQTL`. This will involve modeling gene expression as the dependent variable and SNP genotype (coded as 0, 1, or 2 based on minor allele count) as the independent variable, while controlling for potential confounders such as ancestry and study population. `Chi-square` tests will be employed to examine associations between categorical variables such as chromosome distribution and risk allele presence, while `correlation analysis` will assess relationships between continuous variables like p-values, odds ratios, and risk allele frequencies.
+
+# Limitations
+
+The limitation of the dataset is that there are a lot of NA values in a lot of fields that would affect the downstream analysis. We plan to analyse the dataset using the proposed method using only a select fiew fields as some of the other fields contain descriptions/annotations that are not useful for analysis. We also found that the data type of certain fields are being misinterpreted so we would explore the field before changing the data type of the field. Additionally, the presence of 337 duplicate SNP records suggests inconsistent data curation practices, requiring careful selection criteria to retain the most reliable entries without introducing selection bias. These missing values could introduce bias if they are not missing at random, potentially skewing our understanding of allele frequencies and effect sizes. 
+
+# Libraries
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(stringr)
+```
+
+# Exploratory Data Analysis {#exploratory-data-analysis}
+
+## Loading our dataset
+
+```{r}
+data <- read.table('data/gwas-association-downloaded_2025-09-25-MONDO_0008903-withChildTraits.tsv', sep = '\t', header=TRUE)
+```
+
+### Summary of our dataset
+
+```{r}
+column_names <- colnames(data)
+cat(paste0('Column names of the GWAS dataset:\t', column_names, '\n'))
+summary(data)
+```
+
+We see that some variables such as Chromosome position and Pubmed ID which misinterpreted as different data types by R. So in the next section, we change the data type of the column to match their true quality.
+
+## Changing the some data type of some columns as they were declared as str but were int
+
+```{r}
+data$CHR_POS <- as.integer(data$CHR_POS)
+data$PUBMEDID <- as.character(data$PUBMEDID)
+```
+
+# Variable Description {#variable-description}
+
+## Histogram of the Positions of the SNPs
+
+We are looking at the distribution of the positions where these SNPs occur within the genome to get an idea if most of the mutations occur upstream (towards the 5' end) or downstream (towards the 3' end) of the genome.
+
+```{r}
+ggplot(data, aes(CHR_POS, fill=CHR_ID)) +
+    geom_histogram(bins = 50, fill = 'green', color = 'black', alpha = 0.8) +
+    labs(
+        title = 'Frequency of Chromosome Positions',
+        x = 'Chromosome position',
+        y = 'Count'
+    )
+h <-hist(data$CHR_POS, probability =  TRUE, col = 'lightblue', main = 'Distribution of Chromosome Positions')
+lines(density(na.omit(data$CHR_POS)), col = 'green', lwd = 2)
+
+summary(data$CHR_POS)
+```
+
+The SNP chromosome positions nearly span the entirety of the human genome with values ranging from 242kb (kilobases) to 245Mb (Megabases). The median SNP position is approximately 51.5Mb while the mean which is being skewed by larger values is 68.6Mb. SNPs are distributed across the genome, while clusters of SNPs occurring in certain regions may indicate the possibility of potential trans-eQTLs.
+
+## Barplot of Chromosomes
+
+These chromosomes are condensed forms of the DNA where the SNPs occur and we are visualizng which of the chromosomes in the body seems to be associated with frequent mutations that leads to Lung cancer.
+
+```{r}
+valid_chr <- as.character(c(1:22, "X", "Y", "MT"))
+data <- data %>%      # Cleaning the CHR_ID as it contained dirty mixed values
+    mutate(
+        CHR_ID_clean = str_trim(CHR_ID),
+        CHR_ID_clean = str_extract(CHR_ID_clean, "^[0-9]+$|^X$|^Y$|^MT$"),
+        CHR_ID_clean = ifelse(CHR_ID_clean %in% valid_chr, CHR_ID_clean, NA)
+) %>%
+    filter(!is.na(CHR_ID_clean))
+ggplot(data, aes(x = CHR_ID_clean)) +
+    geom_bar(fill = 'steelblue',color = 'blue', na.rm=TRUE) +
+    labs(
+        title = 'Counts of SNPs by Chromosome',
+        x = 'Chromosomes',
+        y = 'Count'            
+    )
+```
+
+We find that most of the SNPs are found on Chromosome 6, followed by chromosomes 15 and 2. From this, we can infer that mutations associated with chromosome 6 may play a particularly important role in lung cancer susceptibility. At a glance, these findings indicate hotspots for targeted therapy that may decrease the risk of lung cancer susceptibility.
+
+## Histogram of Risk Allele frequency
+
+Risk Allele Frequency is the proportion of chromosomes in a population that carry this risk allele as these alleles increase the likelihood of developing the disease.
+
+```{r}
+data <- data %>%
+    mutate(
+        RAF = ifelse(RISK.ALLELE.FREQUENCY == "NR", NA, RISK.ALLELE.FREQUENCY),
+        RAF = as.numeric(RAF)
+    )
+
+h <- hist(data$RAF, probability = TRUE,col = 'brown', main = 'Distribution of Risk Allele Frequency', xlab = 'Risk Allele Frequency', ylab = 'Proportion')
+lines(density(na.omit(data$RAF)), col = 'pink', lwd = 3)
+
+summary(data$RAF)
+```
+
+The Risk Allele Frequency (RAF) values range from 0 (rare alleles) to 0.9998 (nearly fixed alleles). The median RAF 0.1230, which is more useful in this feature of the dataset as it is right-skewed, indicating that half of the risk alleles occur in less than 12% of the population. The mean RAF 0.2728 though higher is affected by some common alleles. The IQR which lies between 0.0240 and 0.4576 captures majority of the moderately frequent risk alleles. Also 453 alleles lacked RAF values and were marked `NR` which were converted to `NA` values. 
+
+## Checking for duplicated SNPs
+
+```{r}
+sum(duplicated(data$SNPS))
+```
+
+We found that there are around 337 duplicate SNPs that need to be filtered out. These duplicated records may arise from multiple studies reporting on the same SNP under different experimental conditions, sample populations, and statistical models. We plan to do the filtering based on biologically meaningful properties such as Risk Allele Frequency, p-value, odds ratio. This ensures that for each unique SNP, only the most reliable and informative record is being retained.
