@@ -1,0 +1,286 @@
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+#1. Link to the Dataset:
+
+Goad, Nathan, 2018, "Diabetic Ketoacidosis and Hyperchloremia Full Dataset," https://doi.org/10.7910/DVN/PX9K2R, Harvard Dataverse, V1.
+
+#2. Introduction to the Dataset:
+
+This dataset contains clinical and laboratory data from a retrospective cohort study conducted at Wake Forest Baptist Medical Center. It includes information on adult patients admitted with diabetic ketoacidosis (DKA) and compares those who developed hyperchloremia during management to those who maintained normal chloride levels. The dataset captures baseline demographic, clinical, and laboratory measurements, as well as treatment details and a range of clinical outcomes. The goal is to explore the clinical impact of hyperchloremia, a common electrolyte imbalance often associated with DKA treatment, on patient outcomes.
+
+#3. Dataset Justification:
+
+We selected the Diabetic Ketoacidosis and Hyperchloremia dataset for its strong relevance to current clinical practice and its robust structure for statistical analysis. Understanding the factors that influence outcomes in DKA patients is a critical public health concern, and this dataset provides a rich, real-world context for our research. It contains a diverse set of variables, including both continuous (e.g., blood glucose, length of stay) and categorical (e.g., AKI status, gender) data, making it an ideal platform for applying a wide range of descriptive, inferential, and predictive statistical methods taught in this course. The dataset is publicly available, ethically sourced, de-identified, and well-documented, ensuring that our analysis is transparent, reproducible, and compliant with all project guidelines.
+
+#4. RESEARCH QUESTION
+
+A. Impact of IV Fluid Type on Chloride Levels
+This question investigates whether the type of intravenous fluid given during DKA treatment affects peak chloride levels and the likelihood of developing hyperchloremia. Since chloride-rich fluids like 0.9% NaCl may increase the risk of electrolyte imbalances compared to balanced solutions like Lactated Ringer’s or Plasma-Lyte, this analysis aims to see if outcomes differ based on fluid choice. Adjusting for factors such as total IV fluid volume and initial DKA severity ensures that the observed effects reflect fluid type rather than overall treatment intensity.
+B. Predictors of Acute Kidney Injury (AKI)
+This question aims to identify which patient characteristics at admission (e.g., age, APACHE II score, baseline creatinine, admission glucose and pH) and treatment-related factors (e.g., volume of 0.9% NaCl, peak chloride, sepsis, hypotension, bicarbonate use) are most strongly linked to the development of AKI during hospitalization. Predictive modeling will help determine which variables contribute most to AKI risk, allowing clinicians to identify high-risk patients early and adjust management strategies accordingly.
+
+## VARIABLE DESCRIPTION
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(knitr)
+
+#load dataset into R
+
+data <- read_excel("C:/Users/Geetha/Downloads/Hyperchloremia and DKA Dataset .xlsx")
+head(data)
+na_counts <- sapply(data, function(x) sum(is.na(x)))
+na_counts <- na_counts[na_counts > 0]
+print("Variables with Missing Values:")
+print(na_counts)
+```
+##This output shows the number of missing values for each variable. Most variables have no missing values, indicating a nearly complete dataset, but a few variables like Hospital AKI, Time of Onset from initiation of DKA treatment (84 missing), Duration of Admission Acute Kidney Injury (14 missing), and Subcutaneous Insulin Overlap by 1-2 hr (2 missing) have some gaps that may need careful handling during analysis. Overall, the dataset is largely complete and ready for exploratory analysis.
+
+##The dataset contains 50 variables, of which 23 are categorical and 27 are numerical. Categorical variables describe groups or categories, while numerical variables represent measurable quantities.
+
+Key Variables Selection for Analysis
+
+Research Question 1: Impact of IV Fluid Type on Chloride Levels.The main outcome of interest is the Peak Chloride Category (0 = normochloremia, 1 = hyperchloremia), which indicates whether patients developed hyperchloremia during treatment. Key numerical variables include Peak Chloride (mEq/L) as the continuous measure of serum chloride, Total IV Fluid Volume (mL) to account for the overall amount of fluid administered, and Admission Bicarbonate (mEq/L) to reflect baseline metabolic status. These variables collectively allow assessment of how the type and quantity of intravenous fluids may influence chloride levels in patients with DKA.
+
+Research Question 2: Predictors of Acute Kidney Injury (AKI).The primary outcome is the occurrence of Acute Kidney Injury in Hospital (0 = no, 1 = yes). Important categorical predictors include Sepsis (0 = no, 1 = yes), Hypotension (0 = no, 1 = yes), and Peak Chloride Category, to evaluate whether hyperchloremia contributes independently to AKI risk. Numerical predictors include Age (years), APACHE II Score as a measure of illness severity, Admission Serum Creatinine (mg/dL) to capture baseline kidney function, and Volume of 0.9% NaCl (mL) to explore potential fluid-related effects. Together, these variables provide a clinically meaningful framework for identifying factors associated with AKI in critically ill DKA patients.
+
+```{r}
+
+#key numerical variables list
+numerical_vars <- c(
+  "Peak Chloride (mEq/L)",
+  "Total IV Fluid Volume (mL)",
+  "Admission Bicarbonate (mEq/L)",
+  "Age (years)",
+  "APACHE II Score",
+  "Admission Serum Creatinine (mg/dL)",
+  "Volume of 0.9% NaCl (mL)"
+)
+# key categorical variables list
+categorical_vars <- c(
+  "Acute Kidney Injury In Hospital (0 = no, 1 yes)",
+  "Sepsis (0 = no, 1 = yes)",
+  "Hypotension (0 = no, 1 = yes)",
+  "Peak Chloride Category (0 = normochloremia, 1 = hyperchloremia)"
+)
+# Converting categorical variables to factors with meaningful labels
+data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)` <- 
+  factor(data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)`,
+         levels = c(0,1),
+         labels = c("No","Yes"))
+data$`Sepsis (0 = no, 1 = yes)` <-
+  factor(data$`Sepsis (0 = no, 1 = yes)`,
+         levels = c(0, 1),
+         labels = c("No", "Yes"))
+data$`Hypotension (0 = no, 1 = yes)` <-
+  factor(data$`Hypotension (0 = no, 1 = yes)`,
+         levels = c(0, 1),
+         labels = c("No", "Yes"))
+data$`Peak Chloride Category (0 = normochloremia, 1 = hyperchloremia)` <-
+  factor(data$`Peak Chloride Category (0 = normochloremia, 1 = hyperchloremia)`,
+         levels = c(0, 1),
+         labels = c("Normochloremia", "Hyperchloremia"))
+# Summary of numerical variables
+summary(data[numerical_vars])
+# Summary of categorical variables
+sapply(data[, categorical_vars], function(x) table(x))
+```
+```{r}
+# Histogram for one numerical variable (e.g., Peak Chloride)
+hist(data$`Peak Chloride (mEq/L)`,
+     main = "Histogram of Peak Chloride",
+     xlab = "Peak Chloride (mEq/L)",
+     col = "lightblue",
+     border = "black")
+
+# Bar plot for one categorical variable (e.g., Peak Chloride Category)
+barplot(table(data$`Peak Chloride Category (0 = normochloremia, 1 = hyperchloremia)`),
+        main = "Bar Plot of Peak Chloride Category",
+        xlab = "Chloride Category",
+        ylab = "Count",
+        col = "lightgreen")
+
+```
+## Interpretation: The dataset shows a balanced distribution between the two categories of Peak Chloride, with nearly equal numbers of patients in the normochloremia and hyperchloremia groups, which is ideal for comparative analyses. The histogram of Peak Chloride reveals a right-skewed distribution, where most patients have chloride levels within the normal to mildly elevated range (approximately 100–115 mEq/L), but a small subset exhibits much higher values, creating a long tail. This indicates that while the majority of patients maintain typical chloride levels, there is a distinct group experiencing markedly elevated chloride, highlighting variability that is important for understanding the impact of IV fluids and identifying potential risk factors.
+
+#6.DATA PREPROCESSING AND CLEANUP
+
+The analysis will begin with loading the dataset into R and reviewing its structure to understand the types and distributions of variables. Planned steps include checking for missing values and inconsistencies in key variables, as well as identifying and handling any duplicate records to prevent bias. Variable types will be verified and, if necessary, converted—for example, numeric data stored as characters will be recoded to numeric format. Variable names will be standardized to ensure they are clear and R-friendly. Key categorical variables, such as Sepsis (0 = no, 1 = yes) and Acute Kidney Injury In Hospital (0 = no, 1 = yes), may be converted into factors with meaningful labels to improve interpretability and facilitate plotting. Additionally, derived variables, such as a categorical variable representing the dominant IV fluid type, may be created to address specific research questions. Variables with a high proportion of missing data will be noted and potentially excluded from primary analyses to maintain data quality. These preparatory steps are designed to ensure the dataset is reliable, consistent, and ready for subsequent statistical and graphical analyses.
+
+## Descriptive Statistics 
+```{r}
+#summary table for numerical variables
+num_summary <- data.frame(
+  Variable = numerical_vars,
+  Mean = as.numeric(sapply(numerical_vars, function(var) mean(data[[var]], na.rm = TRUE))),
+  Median = as.numeric(sapply(numerical_vars, function(var) median(data[[var]], na.rm = TRUE))),
+  SD = as.numeric(sapply(numerical_vars, function(var) sd(data[[var]], na.rm = TRUE))),
+  Min = as.numeric(sapply(numerical_vars, function(var) min(data[[var]], na.rm = TRUE))),
+  Max = as.numeric(sapply(numerical_vars, function(var) max(data[[var]], na.rm = TRUE)))
+)
+print(num_summary)
+#Summary table for categorical variables
+cat_summary <- lapply(categorical_vars, function(var) {
+  tbl <- table(data[[var]])
+  prop <- prop.table(tbl) * 100
+  list(Counts = tbl, Proportions = round(prop, 1))
+})
+names(cat_summary) <- categorical_vars
+print("Categorical Variables Summary:")
+print(cat_summary)
+```
+##DATA VISUALIZATION
+```{r}
+# Histogram for APACHE II Score
+hist(data$`APACHE II Score`,
+     main = "APACHE II Score Distribution",
+     xlab = "APACHE II Score",
+     ylab = "Count",
+     col = "salmon",
+     border = "black")
+```
+##The histogram provide important insights into the baseline characteristics of the patient cohort that are directly relevant to predicting AKI. The APACHE II Score distribution is right-skewed, with most patients having lower scores but a long tail of critically ill patients, highlighting the wide range of illness severity that must be accounted for in the analysis.
+```{r}
+data$Dominant_Fluid <- ifelse(data$`Volume of 0.9% NaCl (mL)` >
+                               (data$`Volume of Lactated Ringer's (mL)` + data$`Volume of Plasma-Lyte (mL)`),
+                               "Normal Saline", "Balanced Fluids")
+
+#Barplot: Peak Chloride Category vs Dominant Fluid 
+chloride_fluid_table <- table(data$Dominant_Fluid, data$`Peak Chloride Category (0 = normochloremia, 1 = hyperchloremia)`)
+barplot(chloride_fluid_table,
+        beside = TRUE,
+        col = c("lightblue", "orange"),
+        main = "Hyperchloremia by Dominant IV Fluid Type",
+        ylab = "Count",
+        legend.text = rownames(chloride_fluid_table))
+```
+##The barplot compares the incidence of hyperchloremia between patients whose dominant IV fluid was normal saline versus balanced fluids. It visually demonstrates that nearly all patients received normal saline, reflecting real-world DKA management practices. Among these patients, there is a higher count of hyperchloremia compared to normochloremia, suggesting that greater exposure to saline may contribute to elevated chloride levels. In contrast, the small number of patients receiving balanced fluids makes it difficult to draw meaningful comparisons between fluid types. This plot supports the decision to shift the analysis from fluid type comparisons to examining the relationship between saline volume and hyperchloremia, as the variation in saline administration is sufficient to explore potential dose-dependent effects on chloride derangements.
+```{r}
+
+# Boxplot of Peak Chloride by Peak Chloride Category
+boxplot(data$`Peak Chloride (mEq/L)` ~ data$`Peak Chloride Category (0 = normochloremia, 1 = hyperchloremia)`,
+        main = "Peak Chloride Levels by Category",
+        xlab = "Peak Chloride Category",
+        ylab = "Peak Chloride (mEq/L)",
+        ylim=c(50,150),
+        col = c("lightblue", "orange"))
+```
+##The boxplot of Peak Chloride by Category confirms that patients classified as hyperchloremic have substantially higher median and overall chloride levels than those with normochloremia, validating the outcome variable. Similarly, patients who developed AKI show higher median APACHE II Scores and Admission Creatinine, indicating that greater illness severity and poorer baseline kidney function are important predictors of AKI in this cohort.
+
+#7.The descriptive statistics and visualizations:
+
+It reveal several important features and anomalies in the dataset. The APACHE II Score distribution is notably right-skewed, with most patients clustered at lower severity but a small subset showing very high scores, reflecting a minority of critically ill patients who may disproportionately influence outcomes. Similarly, Admission Creatinine and Peak Chloride also show right-skewed distributions, with a few patients exhibiting markedly elevated values, suggesting baseline kidney dysfunction or significant electrolyte derangements beyond the typical range. The barplot of fluid type vs hyperchloremia highlights a key imbalance: nearly all patients received normal saline, while very few received balanced fluids, limiting fluid-type comparisons and narrowing the analysis to saline exposure. Finally, the boxplot of Peak Chloride by Category confirms that hyperchloremic patients had substantially higher chloride levels, validating the outcome definition but also underscoring variability driven by outliers. Together, these anomalies—skewed distributions, outliers, and treatment imbalances—emphasize the need for careful statistical modeling and sensitivity analyses to avoid biased interpretations.
+
+#8.PLANNED STATISTICAL METHODS 
+In addition to the primary analyses, we plan to explore further relationships using multivariable models and subgroup analyses. Linear regression may be applied to examine continuous outcomes such as hospital length of stay, adjusting for key clinical variables like APACHE II Score, Admission Creatinine, and total IV fluid volume. Logistic regression will be used for binary outcomes such as the development of AKI, allowing assessment of predictors including sepsis, hypotension, peak chloride levels, and saline exposure. We may also perform correlation analyses and stratified comparisons to better understand dose-response relationships, such as the impact of varying saline volumes on hyperchloremia risk. Finally, sensitivity analyses could be conducted to account for potential confounding or skewed distributions, ensuring robust and reliable conclusions.
+
+#9.LIMITATIONS
+Most patients received only normal saline, limiting comparisons with balanced fluids and narrowing the research focus to the impact of saline volume rather than fluid type. Small subgroup sizes (e.g., sepsis, hypotension) reduce statistical power. Skewed distributions of key variables may affect model assumptions, and unmeasured confounders could bias results. Findings may have limited generalizability to other populations or settings.
+
+#10.References
+Goad, N. (2018). Diabetic ketoacidosis and hyperchloremia full dataset [Data set]. Harvard Dataverse. https://doi.org/10.7910/DVN/PX9K2R
+
+Appendix
+
+##Additional Data Visualizations and Interpretations
+```{r}
+
+# Barplot: AKI vs Sepsis
+sepsis_aki_table <- table(data$`Sepsis (0 = no, 1 = yes)`,
+                          data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)`)
+
+barplot(sepsis_aki_table,
+        beside = TRUE,
+        col = c("lightgreen", "salmon"),
+        main = "AKI by Sepsis Status",
+        ylab = "Count",
+        ylim = c(0, 100),
+        legend.text = rownames(sepsis_aki_table))
+```
+Figure A1.This bar plot shows the distribution of patients who did and did not develop AKI, categorized by whether they had sepsis on admission. The number of patients with sepsis is small, but a higher proportion of them appear to have developed AKI compared to the patients without sepsis. This suggests that sepsis is a strong contributing factor to AKI, which is consistent with clinical knowledge. The limited number of sepsis cases, however, may affect the statistical power of any formal analysis.
+
+```{r}
+# Barplot: AKI vs Hypotension
+
+hypotension_aki_table <- table(data$`Hypotension (0 = no, 1 = yes)`,
+                               data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)`)
+
+barplot(hypotension_aki_table,
+        beside = TRUE,
+        col = c("lightyellow", "purple"),
+        main = "AKI by Hypotension Status",
+        ylab = "Count",
+        ylim=c(0,100),
+        legend.text = rownames(hypotension_aki_table))
+```
+Figure A2.Similar to the sepsis plot, this bar plot compares AKI incidence between patients with and without hypotension. The data suggests that hypotension, like sepsis, is a significant risk factor for AKI, as a larger proportion of patients with hypotension developed kidney injury. This finding aligns with the well-established clinical relationship between poor blood flow (hypotension) and renal hypoperfusion.
+
+```{r}
+# Histogram for Admission Serum Creatinine
+hist(data$`Admission Serum Creatinine (mg/dL)`,
+     main = "Admission Creatinine Distribution",
+     xlab = "Admission Serum Creatinine (mg/dL)",
+     ylab = "Count",
+     col = "lightgreen",
+     border = "black")
+```
+Figure A3:The histogram of admission creatinine levels shows a right-skewed distribution, indicating that most patients had creatinine values in the normal to low range (1.0-1.5 mg/dL). This is typical for diabetic ketoacidosis (DKA) patients. However, the presence of a long tail extending to high values (above 3.0 mg/dL) suggests that a small subset of patients had significantly elevated creatinine levels upon admission. This finding is critical because these patients likely had pre-existing kidney issues or severe illness, putting them at a higher risk for developing acute kidney injury (AKI) during their hospitalization. Therefore, admission creatinine is a vital predictor for AKI risk in this dataset.
+
+```{r}
+boxplot(data$`Admission Serum Creatinine (mg/dL)` ~ data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)`,
+        main = "Admission Creatinine by AKI Status",
+        xlab = "AKI Status",
+        ylab = "Admission Serum Creatinine (mg/dL)",
+        ylim=c(0,6),
+        col = c("lightgreen", "salmon"))
+```
+Figure A4.This boxplot visually confirms that patients who developed AKI during their hospitalization had a higher median admission serum creatinine than those who did not. The higher baseline creatinine level in the AKI group indicates that a degree of pre-existing kidney dysfunction or a higher degree of illness severity at the time of admission is a critical predictor for the development of AKI in DKA patients.
+
+
+```{r}
+boxplot(data$`APACHE II Score` ~ data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)`,
+        main = "APACHE II Score by AKI Status",
+        xlab = "AKI Status",
+        ylab = "APACHE II Score",
+        ylim=c(0,50),
+        col = c("lightblue", "orange"))
+```
+
+FigureA5:This boxplot shows the distribution of APACHE II scores, a measure of illness severity, for both groups. Patients who developed AKI have a significantly higher median APACHE II score. This supports the hypothesis that a higher burden of illness on admission is a key predictor of AKI risk, as reflected by the score's components, which include physiological and demographic data. This plot validates the use of the APACHE II score as a crucial variable in the predictive models for AKI.
+
+
+```{r}
+
+#Barplot: AKI vs Sepsis
+sepsis_aki_table <- table(data$`Sepsis (0 = no, 1 = yes)`,
+                          data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)`)
+barplot(sepsis_aki_table,
+        beside = TRUE,
+        col = c("lightgreen", "salmon"),
+        main = "AKI by Sepsis Status",
+        ylab = "Count",
+        ylim = c(0, 100),
+        legend.text = rownames(sepsis_aki_table))
+```
+Figure A6.Patients with sepsis have a substantially higher proportion of AKI compared to non-septic patients, despite their smaller numbers. This indicates that sepsis is an important risk factor for AKI in this DKA cohort.
+```{r}
+
+# Barplot: AKI vs Hypotension
+hypotension_aki_table <- table(data$`Hypotension (0 = no, 1 = yes)`,
+                               data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)`)
+barplot(hypotension_aki_table,
+        beside = TRUE,
+        col = c("lightyellow", "purple"),
+        main = "AKI by Hypotension Status",
+        ylab = "Count",
+        ylim=c(0,100),
+        legend.text = rownames(hypotension_aki_table))
+
+```
+
+Figure A7. Patients who were hypotensive on admission show a markedly higher proportion of AKI than those without hypotension. This suggests that hypotension is a strong predictor of AKI development in this population.
+
+

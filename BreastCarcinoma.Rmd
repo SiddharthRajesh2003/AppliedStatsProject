@@ -1,0 +1,127 @@
+---
+title: "Exploratory Data Analysis of Breast Invasive Carcinoma (TCGA, PanCancer Atlas, 2018)"
+output: pdf_document
+---
+Introduction
+
+The Breast Invasive Carcinoma dataset from TCGA PanCancer Atlas (2018) contains clinical information for 1,084 patients with breast cancer. The dataset includes demographic details such as age, sex, race, and ethnicity; clinical features including tumor stage, lymph node status, and subtype; and outcome data such as overall survival, disease-free survival, and progression-free survival. It offers a well-documented, de-identified resource that can be used to explore associations between clinical features and patient outcomes.
+
+Dataset Justification
+
+This dataset was selected because it meets the requirements for size, complexity, and biomedical relevance. With 38 variables and over 1,000 patients, it provides ample opportunities to apply descriptive statistics and visualization techniques. It includes both categorical and continuous variables, such as age, sex, subtype, and survival months. The dataset is ethically sourced and publicly available through cBioPortal, making it a strong candidate for meaningful analysis.
+
+
+Research Questions
+
+1. What is the age distribution of breast cancer patients, and does it differ by molecular subtype?
+2. How do tumor stage and subtype relate to overall survival?
+3. Are there differences in overall survival between patients who received radiation therapy and those who did not?
+
+Data Wrangling and Cleanup
+
+```{r}
+# Load dataset
+data <- read.delim("~/Downloads/brca_tcga_pan_can_atlas_2018/data_clinical_patient.txt", comment.char="#", header=TRUE)
+
+# Inspect dataset
+dim(data)
+colnames(data)
+str(data)
+
+```
+
+```{r}
+# Convert categorical variables into factors
+data$SEX <- as.factor(data$SEX)
+data$SUBTYPE <- as.factor(data$SUBTYPE)
+data$AJCC_PATHOLOGIC_TUMOR_STAGE <- as.factor(data$AJCC_PATHOLOGIC_TUMOR_STAGE)
+data$RADIATION_THERAPY <- as.factor(data$RADIATION_THERAPY)
+data$OS_STATUS <- as.factor(data$OS_STATUS)
+
+# Check for missing values
+colSums(is.na(data))
+
+# Summary of numeric variables
+summary(data$AGE)
+summary(data$OS_MONTHS)
+
+```
+
+Cleanup summary
+
+The dataset contains 1,084 patients and 38 variables. Some survival fields contain missing values (e.g., DFS months), but overall the dataset is well-structured. Categorical variables were converted to factors for analysis.
+
+
+Exploratory Data Analysis
+Descriptive Statistics
+```{r}
+# Age distribution
+summary(data$AGE)
+
+# Sex distribution
+table(data$SEX)
+
+# Subtype distribution
+table(data$SUBTYPE)
+
+# Tumor stage distribution
+table(data$AJCC_PATHOLOGIC_TUMOR_STAGE)
+
+# Overall survival
+summary(data$OS_MONTHS)
+table(data$OS_STATUS)
+```
+Summary: 
+
+The median age at diagnosis was around 58 years, with patients ranging from 26 to 90 years.
+The majority of patients were female, with only a small number of males.
+The most common subtypes were Luminal A and Luminal B.
+Tumor stages varied, with many patients diagnosed at Stage II.
+Median overall survival was about 27 months, with survival times ranging up to nearly 283 months.
+
+
+Visualizations
+```{r}
+hist(data$AGE,
+     main="Age Distribution of Patients",
+     xlab="Age at Diagnosis",
+     col="lightblue", border="black")
+
+```
+
+Age by Subtype
+```{r}
+boxplot(AGE ~ SUBTYPE, data=data,
+        main="Age by Breast Cancer Subtype",
+        xlab="Subtype", ylab="Age",
+        col="pink", las=2)
+```
+
+Survival by Tumor Stage
+```{r}
+boxplot(OS_MONTHS ~ AJCC_PATHOLOGIC_TUMOR_STAGE, data=data,
+        main="Overall Survival by Tumor Stage",
+        xlab="Tumor Stage", ylab="Overall Survival (Months)",
+        col="lightgreen", las=2)
+```
+
+Age vs Overall Survival
+```{r}
+plot(data$AGE, data$OS_MONTHS,
+     main="Age vs Overall Survival",
+     xlab="Age", ylab="Overall Survival (Months)",
+     pch=16, col="blue")
+```
+
+
+Planned Statistical Methods
+
+Planned analyses include chi-square tests to examine associations between categorical variables such as subtype and tumor stage, and t-tests to compare survival outcomes between groups such as radiation vs non-radiation patients. Correlation and regression methods may also be used to evaluate relationships between age and survival outcomes.
+
+
+Limitations
+
+The dataset is cross-sectional and lacks detailed treatment history beyond radiation and neoadjuvant therapy. Some survival data are incomplete, particularly for disease-free and progression-free survival. The dataset is also biased toward female patients, with very few male cases available for comparison.
+
+Link to dataset: https://www.cbioportal.org/study/summary?id=brca_tcga_pan_can_atlas_2018
+

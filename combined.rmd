@@ -1,0 +1,637 @@
+# Project Proposals by Group 7
+
+## Instructions
+
+1. Create a data folder under your working directory
+2. Download the data to run the rmd file into the data directory.
+ - [Dataset 1](#dataset-can-be-found-here)
+ - [Dataset 2](#link-to-the-dataset)
+ - [Dataset 3](#link-to-dataset)
+
+# Index
+
+1. [Proposal 1](#proposal-1)
+2. [Proposal 2](#proposal-2)
+3. [Proposal 3](#proposal-3)
+
+# Proposal 1
+
+# Exploratory Data Analysis for dataset containing Lung Cancer associated SNPs from GWAS Catalog
+
+#### Dataset can be found here
+
+Dataset Link - [Link](https://www.ebi.ac.uk/gwas/efotraits/MONDO_0008903)
+
+# Appendix
+
+1.  [Introduction](#dataset-introduction)
+2.  [Justification](#dataset-justification)
+3.  [Research Question](#research-question)
+4.  [Data Wrangling](#data-pre-processing-and-cleanup)
+5.  [Exploratory Data Analysis](#exploratory-data-analysis)
+6.  [Statistical methods](#planned-statistical-methods)
+7.  [Limitations](#limitations)
+8.  [Variable Description](#variable-description)
+9.  [Citations](#citations)
+
+# Dataset Introduction {#dataset-introduction}
+
+The dataset contains information about Single Nucleotide Polymorphisms (SNPs) associated with lung cancer sourced from the GWAS dataset. Each record within the dataset corresponds to a SNP reported in a published scientific literature and is reported to have a statistical link to lung cancer susceptibility or outcomes. The dataset includes key features such as SNP ID, the chromosome where the SNP is located at and its exact position in the chromosome, the significance of the SNP is captured through p-values, odds ratio which represents the probability of the said SNP to occur. Altogether, this dataset proves to be comprehensive resource for exploring genetic risk factors underlying lung cancer.
+
+# Dataset Justification {#dataset-justification}
+
+We chose this dataset as we acknowledge that lung cancer remains to be one of the leading cause of death in the world and understanding about the underlying risk factors that cause this fatal disease can help us understand the mechanism of the cancer and develop targeted therapies to prevent it. GWAS Catalog is a well-established knowledge resource for studying these risk factors that combines categorical columns such as SNP ID, Gene Name, ancestry as well as numerical variables such as p-values, odds ratio, and sample sizes. This makes the dataset a flexible option for numerical and categorical analysis. Its biomedical association, rich annotation, and potential to explore genetic risk factors make it a strong candidate for meaningful analysis.
+
+# Research Question {#research-question}
+
+We plan to use the data from GWAS to perform eQTL analysis. eQTL or Expression Quantitative Trait Loci are genomic loci (positions) within the genome that influence gene expression levels. There are 2 types of eQTLs: cis-eQTLs are SNPs which occur within close proximity of a gene thereby controlling the gene expression by possibly altering the region where a transcription factor binds for gene expression. The second type is trans-eQTLs are SNPs which are located anywhere within the human genome, even on a different chromosome. These eQTLs are much harder to identify and often act together with other trans-eQTLs in coordinating gene expression. We would be using this dataset to identify potential eQTLs based on constraints such as p-value less than 5E-8, the proximity of the SNP to the gene etc. After identifying potential eQTLs for Lung Cancer, we would be comparing them against SNPs recorded in the established eQTL database for cancer [PancanQTL](#citations)
+
+# Data Pre-processing and cleanup {#data-pre-processing-and-cleanup}
+
+We found that the dataset contained a lot of NR values in the Risk Allele Frequency column which we plan to convert to NA values as they are not important because the column is actually numerical. We found dirty values within chromosome ID column which we plan to standardize to integers between 1 and 22, as well as X, Y, and MT. We found that certain numerical columns in the dataset that was misinterpreted to be string, which we would handling using as.integer or other similar functions for the other misinterpreted columns. We would also be checking for duplicate SNP IDs to maintain the uniqueness of each SNP.
+
+# Planned Statistical Methods
+
+We could possibly implement classical model such as `linear regression` to understand the relationships between Expression which could be obtained from [GEO](https://www.ncbi.nlm.nih.gov/geo/) (Gene Expression Omnibus) and Genotype which is the SNP that could be integrated using the existing R package `MatrixEQTL`. This will involve modeling gene expression as the dependent variable and SNP genotype (coded as 0, 1, or 2 based on minor allele count) as the independent variable, while controlling for potential confounders such as ancestry and study population. `Chi-square` tests will be employed to examine associations between categorical variables such as chromosome distribution and risk allele presence, while `correlation analysis` will assess relationships between continuous variables like p-values, odds ratios, and risk allele frequencies.
+
+# Limitations
+
+The limitation of the dataset is that there are a lot of NA values in a lot of fields that would affect the downstream analysis. We plan to analyse the dataset using the proposed method using only a select fiew fields as some of the other fields contain descriptions/annotations that are not useful for analysis. We also found that the data type of certain fields are being misinterpreted so we would explore the field before changing the data type of the field. Additionally, the presence of 337 duplicate SNP records suggests inconsistent data curation practices, requiring careful selection criteria to retain the most reliable entries without introducing selection bias. These missing values could introduce bias if they are not missing at random, potentially skewing our understanding of allele frequencies and effect sizes. 
+
+# Libraries
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(stringr)
+```
+
+# Exploratory Data Analysis {#exploratory-data-analysis}
+
+## Loading our dataset
+
+```{r}
+data <- read.table('data/gwas-association-downloaded_2025-09-25-MONDO_0008903-withChildTraits.tsv', sep = '\t', header=TRUE)
+```
+
+### Summary of our dataset
+
+```{r}
+column_names <- colnames(data)
+cat(paste0('Column names of the GWAS dataset:\t', column_names, '\n'))
+summary(data)
+```
+
+We see that some variables such as Chromosome position and Pubmed ID which misinterpreted as different data types by R. So in the next section, we change the data type of the column to match their true quality.
+
+## Changing the some data type of some columns as they were declared as str but were int
+
+```{r}
+data$CHR_POS <- as.integer(data$CHR_POS)
+data$PUBMEDID <- as.character(data$PUBMEDID)
+```
+
+# Variable Description {#variable-description}
+
+## Histogram of the Positions of the SNPs
+
+We are looking at the distribution of the positions where these SNPs occur within the genome to get an idea if most of the mutations occur upstream (towards the 5' end) or downstream (towards the 3' end) of the genome.
+
+```{r}
+ggplot(data, aes(CHR_POS, fill=CHR_ID)) +
+    geom_histogram(bins = 50, fill = 'green', color = 'black', alpha = 0.8) +
+    labs(
+        title = 'Frequency of Chromosome Positions',
+        x = 'Chromosome position',
+        y = 'Count'
+    )
+h <-hist(data$CHR_POS, probability =  TRUE, col = 'lightblue', main = 'Distribution of Chromosome Positions')
+lines(density(na.omit(data$CHR_POS)), col = 'green', lwd = 2)
+
+summary(data$CHR_POS)
+```
+
+The SNP chromosome positions nearly span the entirety of the human genome with values ranging from 242kb (kilobases) to 245Mb (Megabases). The median SNP position is approximately 51.5Mb while the mean which is being skewed by larger values is 68.6Mb. SNPs are distributed across the genome, while clusters of SNPs occurring in certain regions may indicate the possibility of potential trans-eQTLs.
+
+## Barplot of Chromosomes
+
+These chromosomes are condensed forms of the DNA where the SNPs occur and we are visualizng which of the chromosomes in the body seems to be associated with frequent mutations that leads to Lung cancer.
+
+```{r}
+valid_chr <- as.character(c(1:22, "X", "Y", "MT"))
+data <- data %>%      # Cleaning the CHR_ID as it contained dirty mixed values
+    mutate(
+        CHR_ID_clean = str_trim(CHR_ID),
+        CHR_ID_clean = str_extract(CHR_ID_clean, "^[0-9]+$|^X$|^Y$|^MT$"),
+        CHR_ID_clean = ifelse(CHR_ID_clean %in% valid_chr, CHR_ID_clean, NA)
+) %>%
+    filter(!is.na(CHR_ID_clean))
+ggplot(data, aes(x = CHR_ID_clean)) +
+    geom_bar(fill = 'steelblue',color = 'blue', na.rm=TRUE) +
+    labs(
+        title = 'Counts of SNPs by Chromosome',
+        x = 'Chromosomes',
+        y = 'Count'            
+    )
+```
+
+We find that most of the SNPs are found on Chromosome 6, followed by chromosomes 15 and 2. From this, we can infer that mutations associated with chromosome 6 may play a particularly important role in lung cancer susceptibility. At a glance, these findings indicate hotspots for targeted therapy that may decrease the risk of lung cancer susceptibility.
+
+## Histogram of Risk Allele frequency
+
+Risk Allele Frequency is the proportion of chromosomes in a population that carry this risk allele as these alleles increase the likelihood of developing the disease.
+
+```{r}
+data <- data %>%
+    mutate(
+        RAF = ifelse(RISK.ALLELE.FREQUENCY == "NR", NA, RISK.ALLELE.FREQUENCY),
+        RAF = as.numeric(RAF)
+    )
+
+h <- hist(data$RAF, probability = TRUE,col = 'brown', main = 'Distribution of Risk Allele Frequency', xlab = 'Risk Allele Frequency', ylab = 'Proportion')
+lines(density(na.omit(data$RAF)), col = 'pink', lwd = 3)
+
+summary(data$RAF)
+```
+
+The Risk Allele Frequency (RAF) values range from 0 (rare alleles) to 0.9998 (nearly fixed alleles). The median RAF 0.1230, which is more useful in this feature of the dataset as it is right-skewed, indicating that half of the risk alleles occur in less than 12% of the population. The mean RAF 0.2728 though higher is affected by some common alleles. The IQR which lies between 0.0240 and 0.4576 captures majority of the moderately frequent risk alleles. Also 453 alleles lacked RAF values and were marked `NR` which were converted to `NA` values. 
+
+## Checking for duplicated SNPs
+
+```{r}
+sum(duplicated(data$SNPS))
+```
+
+We found that there are around 337 duplicate SNPs that need to be filtered out. These duplicated records may arise from multiple studies reporting on the same SNP under different experimental conditions, sample populations, and statistical models. We plan to do the filtering based on biologically meaningful properties such as Risk Allele Frequency, p-value, odds ratio. This ensures that for each unique SNP, only the most reliable and informative record is being retained.
+
+## Citations
+
+1. Sollis E, Mosaku A, Abid A, Buniello A, Cerezo M, Gil L, Groza T, Güneş O, Hall P, Hayhurst J, Ibrahim A, Ji Y, John S, Lewis E, MacArthur JAL, McMahon A, Osumi-Sutherland D, Panoutsopoulou K, Pendlington Z, Ramachandran S, Stefancsik R, Stewart J, Whetzel P, Wilson R, Hindorff L, Cunningham F, Lambert SA, Inouye M, Parkinson H, Harris LW. The NHGRI-EBI GWAS Catalog: knowledgebase and deposition resource. Nucleic Acids Res. 2023 Jan 6;51(D1):D977-D985. doi: 10.1093/nar/gkac1010. PMID: 36350656; PMCID: PMC9825413.
+
+1. Chen, C., Liu, Y., Luo, M., Yang, J., Chen, Y., Wang, R., Zhou, J., Zang, Y., Diao, L., & Han, L. (2024). PancanQTLv2.0: a comprehensive resource for expression quantitative trait loci across human cancers. Nucleic acids research, 52(D1), D1400–D1406. https://doi.org/10.1093/nar/gkad916
+
+# Proposal 2
+
+## Appendix
+
+1. [Link](#link-to-the-dataset)
+2. [Introduction](#introduction-to-the-dataset)
+3. [Justification](#dataset-justification-1)
+4. [Research Question](#research-question-1)
+5. [Variable Description](#variable-description-1)
+6. [Data preprocessing and cleanup](#data-preprocessing-and-cleanup)
+7. [Descriptive Statistics](#descriptive-statistics-and-visualizations)
+8. [Planned statistical methods](#planned-statistical-methods-1)
+9. [Limitations](#limitations-1)
+10. [References](#references)
+11. [Additional Visualizations](#additional-data-visualizations-and-interpretations)
+
+# 1. Link to the Dataset:
+
+Dataset Link - [Link](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/PX9K2R)
+
+Goad, Nathan, 2018, "Diabetic Ketoacidosis and Hyperchloremia Full Dataset," https://doi.org/10.7910/DVN/PX9K2R, Harvard Dataverse, V1.
+
+# 2. Introduction to the Dataset:
+
+This dataset contains clinical and laboratory data from a retrospective cohort study conducted at Wake Forest Baptist Medical Center. It includes information on adult patients admitted with diabetic ketoacidosis (DKA) and compares those who developed hyperchloremia during management to those who maintained normal chloride levels. The dataset captures baseline demographic, clinical, and laboratory measurements, as well as treatment details and a range of clinical outcomes. The goal is to explore the clinical impact of hyperchloremia, a common electrolyte imbalance often associated with DKA treatment, on patient outcomes.
+
+# 3. Dataset Justification:
+
+We selected the Diabetic Ketoacidosis and Hyperchloremia dataset for its strong relevance to current clinical practice and its robust structure for statistical analysis. Understanding the factors that influence outcomes in DKA patients is a critical public health concern, and this dataset provides a rich, real-world context for our research. It contains a diverse set of variables, including both continuous (e.g., blood glucose, length of stay) and categorical (e.g., AKI status, gender) data, making it an ideal platform for applying a wide range of descriptive, inferential, and predictive statistical methods taught in this course. The dataset is publicly available, ethically sourced, de-identified, and well-documented, ensuring that our analysis is transparent, reproducible, and compliant with all project guidelines.
+
+# 4. RESEARCH QUESTION
+
+A. Impact of IV Fluid Type on Chloride Levels
+This question investigates whether the type of intravenous fluid given during DKA treatment affects peak chloride levels and the likelihood of developing hyperchloremia. Since chloride-rich fluids like 0.9% NaCl may increase the risk of electrolyte imbalances compared to balanced solutions like Lactated Ringer’s or Plasma-Lyte, this analysis aims to see if outcomes differ based on fluid choice. Adjusting for factors such as total IV fluid volume and initial DKA severity ensures that the observed effects reflect fluid type rather than overall treatment intensity.
+
+B. Predictors of Acute Kidney Injury (AKI)
+This question aims to identify which patient characteristics at admission (e.g., age, APACHE II score, baseline creatinine, admission glucose and pH) and treatment-related factors (e.g., volume of 0.9% NaCl, peak chloride, sepsis, hypotension, bicarbonate use) are most strongly linked to the development of AKI during hospitalization. Predictive modeling will help determine which variables contribute most to AKI risk, allowing clinicians to identify high-risk patients early and adjust management strategies accordingly.
+
+# 5. VARIABLE DESCRIPTION
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(knitr)
+
+#load dataset into R
+
+data <- read_excel("data/Hyperchloremia and DKA Dataset .xlsx")
+head(data)
+na_counts <- sapply(data, function(x) sum(is.na(x)))
+na_counts <- na_counts[na_counts > 0]
+print("Variables with Missing Values:")
+print(na_counts)
+```
+
+This output shows the number of missing values for each variable. Most variables have no missing values, indicating a nearly complete dataset, but a few variables like Hospital AKI, Time of Onset from initiation of DKA treatment (84 missing), Duration of Admission Acute Kidney Injury (14 missing), and Subcutaneous Insulin Overlap by 1-2 hr (2 missing) have some gaps that may need careful handling during analysis. Overall, the dataset is largely complete and ready for exploratory analysis.
+
+The dataset contains 50 variables, of which 23 are categorical and 27 are numerical. Categorical variables describe groups or categories, while numerical variables represent measurable quantities.
+
+Key Variables Selection for Analysis
+
+Research Question 1: Impact of IV Fluid Type on Chloride Levels.The main outcome of interest is the Peak Chloride Category (0 = normochloremia, 1 = hyperchloremia), which indicates whether patients developed hyperchloremia during treatment. Key numerical variables include Peak Chloride (mEq/L) as the continuous measure of serum chloride, Total IV Fluid Volume (mL) to account for the overall amount of fluid administered, and Admission Bicarbonate (mEq/L) to reflect baseline metabolic status. These variables collectively allow assessment of how the type and quantity of intravenous fluids may influence chloride levels in patients with DKA.
+
+Research Question 2: Predictors of Acute Kidney Injury (AKI).The primary outcome is the occurrence of Acute Kidney Injury in Hospital (0 = no, 1 = yes). Important categorical predictors include Sepsis (0 = no, 1 = yes), Hypotension (0 = no, 1 = yes), and Peak Chloride Category, to evaluate whether hyperchloremia contributes independently to AKI risk. Numerical predictors include Age (years), APACHE II Score as a measure of illness severity, Admission Serum Creatinine (mg/dL) to capture baseline kidney function, and Volume of 0.9% NaCl (mL) to explore potential fluid-related effects. Together, these variables provide a clinically meaningful framework for identifying factors associated with AKI in critically ill DKA patients.
+
+```{r}
+#key numerical variables list
+numerical_vars <- c(
+  "Peak Chloride (mEq/L)",
+  "Total IV Fluid Volume (mL)",
+  "Admission Bicarbonate (mEq/L)",
+  "Age (years)",
+  "APACHE II Score",
+  "Admission Serum Creatinine (mg/dL)",
+  "Volume of 0.9% NaCl (mL)"
+)
+# key categorical variables list
+categorical_vars <- c(
+  "Acute Kidney Injury In Hospital (0 = no, 1 yes)",
+  "Sepsis (0 = no, 1 = yes)",
+  "Hypotension (0 = no, 1 = yes)",
+  "Peak Chloride Category (0 = normochloremia, 1 = hyperchloremia)"
+)
+# Converting categorical variables to factors with meaningful labels
+data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)` <- 
+  factor(data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)`,
+         levels = c(0,1),
+         labels = c("No","Yes"))
+data$`Sepsis (0 = no, 1 = yes)` <-
+  factor(data$`Sepsis (0 = no, 1 = yes)`,
+         levels = c(0, 1),
+         labels = c("No", "Yes"))
+data$`Hypotension (0 = no, 1 = yes)` <-
+  factor(data$`Hypotension (0 = no, 1 = yes)`,
+         levels = c(0, 1),
+         labels = c("No", "Yes"))
+data$`Peak Chloride Category (0 = normochloremia, 1 = hyperchloremia)` <-
+  factor(data$`Peak Chloride Category (0 = normochloremia, 1 = hyperchloremia)`,
+         levels = c(0, 1),
+         labels = c("Normochloremia", "Hyperchloremia"))
+# Summary of numerical variables
+summary(data[numerical_vars])
+# Summary of categorical variables
+sapply(data[, categorical_vars], function(x) table(x))
+```
+
+```{r}
+# Histogram for one numerical variable (e.g., Peak Chloride)
+hist(data$`Peak Chloride (mEq/L)`,
+     main = "Histogram of Peak Chloride",
+     xlab = "Peak Chloride (mEq/L)",
+     col = "lightblue",
+     border = "black")
+
+# Bar plot for one categorical variable (e.g., Peak Chloride Category)
+barplot(table(data$`Peak Chloride Category (0 = normochloremia, 1 = hyperchloremia)`),
+        main = "Bar Plot of Peak Chloride Category",
+        xlab = "Chloride Category",
+        ylab = "Count",
+        col = "lightgreen")
+
+```
+
+Interpretation: The dataset shows a balanced distribution between the two categories of Peak Chloride, with nearly equal numbers of patients in the normochloremia and hyperchloremia groups, which is ideal for comparative analyses. The histogram of Peak Chloride reveals a right-skewed distribution, where most patients have chloride levels within the normal to mildly elevated range (approximately 100–115 mEq/L), but a small subset exhibits much higher values, creating a long tail. This indicates that while the majority of patients maintain typical chloride levels, there is a distinct group experiencing markedly elevated chloride, highlighting variability that is important for understanding the impact of IV fluids and identifying potential risk factors.
+
+# 6.DATA PREPROCESSING AND CLEANUP
+
+The analysis will begin with loading the dataset into R and reviewing its structure to understand the types and distributions of variables. Planned steps include checking for missing values and inconsistencies in key variables, as well as identifying and handling any duplicate records to prevent bias. Variable types will be verified and, if necessary, converted—for example, numeric data stored as characters will be recoded to numeric format. Variable names will be standardized to ensure they are clear and R-friendly. Key categorical variables, such as Sepsis (0 = no, 1 = yes) and Acute Kidney Injury In Hospital (0 = no, 1 = yes), may be converted into factors with meaningful labels to improve interpretability and facilitate plotting. Additionally, derived variables, such as a categorical variable representing the dominant IV fluid type, may be created to address specific research questions. Variables with a high proportion of missing data will be noted and potentially excluded from primary analyses to maintain data quality. These preparatory steps are designed to ensure the dataset is reliable, consistent, and ready for subsequent statistical and graphical analyses.
+
+# 7.Descriptive statistics and visualizations
+
+## Descriptive Statistics 
+```{r}
+#summary table for numerical variables
+num_summary <- data.frame(
+  Variable = numerical_vars,
+  Mean = as.numeric(sapply(numerical_vars, function(var) mean(data[[var]], na.rm = TRUE))),
+  Median = as.numeric(sapply(numerical_vars, function(var) median(data[[var]], na.rm = TRUE))),
+  SD = as.numeric(sapply(numerical_vars, function(var) sd(data[[var]], na.rm = TRUE))),
+  Min = as.numeric(sapply(numerical_vars, function(var) min(data[[var]], na.rm = TRUE))),
+  Max = as.numeric(sapply(numerical_vars, function(var) max(data[[var]], na.rm = TRUE)))
+)
+print(num_summary)
+#Summary table for categorical variables
+cat_summary <- lapply(categorical_vars, function(var) {
+  tbl <- table(data[[var]])
+  prop <- prop.table(tbl) * 100
+  list(Counts = tbl, Proportions = round(prop, 1))
+})
+names(cat_summary) <- categorical_vars
+print("Categorical Variables Summary:")
+print(cat_summary)
+```
+
+## DATA VISUALIZATION
+
+```{r}
+# Histogram for APACHE II Score
+hist(data$`APACHE II Score`,
+     main = "APACHE II Score Distribution",
+     xlab = "APACHE II Score",
+     ylab = "Count",
+     col = "salmon",
+     border = "black")
+```
+
+The histogram provide important insights into the baseline characteristics of the patient cohort that are directly relevant to predicting AKI. The APACHE II Score distribution is right-skewed, with most patients having lower scores but a long tail of critically ill patients, highlighting the wide range of illness severity that must be accounted for in the analysis.
+
+```{r}
+data$Dominant_Fluid <- ifelse(data$`Volume of 0.9% NaCl (mL)` >
+                               (data$`Volume of Lactated Ringer's (mL)` + data$`Volume of Plasma-Lyte (mL)`),
+                               "Normal Saline", "Balanced Fluids")
+
+#Barplot: Peak Chloride Category vs Dominant Fluid 
+chloride_fluid_table <- table(data$Dominant_Fluid, data$`Peak Chloride Category (0 = normochloremia, 1 = hyperchloremia)`)
+barplot(chloride_fluid_table,
+        beside = TRUE,
+        col = c("lightblue", "orange"),
+        main = "Hyperchloremia by Dominant IV Fluid Type",
+        ylab = "Count",
+        legend.text = rownames(chloride_fluid_table))
+```
+
+The barplot compares the incidence of hyperchloremia between patients whose dominant IV fluid was normal saline versus balanced fluids. It visually demonstrates that nearly all patients received normal saline, reflecting real-world DKA management practices. Among these patients, there is a higher count of hyperchloremia compared to normochloremia, suggesting that greater exposure to saline may contribute to elevated chloride levels. In contrast, the small number of patients receiving balanced fluids makes it difficult to draw meaningful comparisons between fluid types. This plot supports the decision to shift the analysis from fluid type comparisons to examining the relationship between saline volume and hyperchloremia, as the variation in saline administration is sufficient to explore potential dose-dependent effects on chloride derangements.
+
+```{r}
+
+# Boxplot of Peak Chloride by Peak Chloride Category
+boxplot(data$`Peak Chloride (mEq/L)` ~ data$`Peak Chloride Category (0 = normochloremia, 1 = hyperchloremia)`,
+        main = "Peak Chloride Levels by Category",
+        xlab = "Peak Chloride Category",
+        ylab = "Peak Chloride (mEq/L)",
+        ylim=c(50,150),
+        col = c("lightblue", "orange"))
+```
+
+The boxplot of Peak Chloride by Category confirms that patients classified as hyperchloremic have substantially higher median and overall chloride levels than those with normochloremia, validating the outcome variable. Similarly, patients who developed AKI show higher median APACHE II Scores and Admission Creatinine, indicating that greater illness severity and poorer baseline kidney function are important predictors of AKI in this cohort.
+
+
+It reveals several important features and anomalies in the dataset. The APACHE II Score distribution is notably right-skewed, with most patients clustered at lower severity but a small subset showing very high scores, reflecting a minority of critically ill patients who may disproportionately influence outcomes. Similarly, Admission Creatinine and Peak Chloride also show right-skewed distributions, with a few patients exhibiting markedly elevated values, suggesting baseline kidney dysfunction or significant electrolyte derangements beyond the typical range. The barplot of fluid type vs hyperchloremia highlights a key imbalance: nearly all patients received normal saline, while very few received balanced fluids, limiting fluid-type comparisons and narrowing the analysis to saline exposure. Finally, the boxplot of Peak Chloride by Category confirms that hyperchloremic patients had substantially higher chloride levels, validating the outcome definition but also underscoring variability driven by outliers. Together, these anomalies—skewed distributions, outliers, and treatment imbalances—emphasize the need for careful statistical modeling and sensitivity analyses to avoid biased interpretations.
+
+# 8.PLANNED STATISTICAL METHODS 
+In addition to the primary analyses, we plan to explore further relationships using multivariable models and subgroup analyses. Linear regression may be applied to examine continuous outcomes such as hospital length of stay, adjusting for key clinical variables like APACHE II Score, Admission Creatinine, and total IV fluid volume. Logistic regression will be used for binary outcomes such as the development of AKI, allowing assessment of predictors including sepsis, hypotension, peak chloride levels, and saline exposure. We may also perform correlation analyses and stratified comparisons to better understand dose-response relationships, such as the impact of varying saline volumes on hyperchloremia risk. Finally, sensitivity analyses could be conducted to account for potential confounding or skewed distributions, ensuring robust and reliable conclusions.
+
+# 9.LIMITATIONS
+Most patients received only normal saline, limiting comparisons with balanced fluids and narrowing the research focus to the impact of saline volume rather than fluid type. Small subgroup sizes (e.g., sepsis, hypotension) reduce statistical power. Skewed distributions of key variables may affect model assumptions, and unmeasured confounders could bias results. Findings may have limited generalizability to other populations or settings.
+
+# 10.References
+Goad, N. (2018). Diabetic ketoacidosis and hyperchloremia full dataset [Data set]. Harvard Dataverse. https://doi.org/10.7910/DVN/PX9K2R
+
+# 11. Additional Data Visualizations and Interpretations
+```{r}
+
+# Barplot: AKI vs Sepsis
+sepsis_aki_table <- table(data$`Sepsis (0 = no, 1 = yes)`,
+                          data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)`)
+
+barplot(sepsis_aki_table,
+        beside = TRUE,
+        col = c("lightgreen", "salmon"),
+        main = "AKI by Sepsis Status",
+        ylab = "Count",
+        ylim = c(0, 100),
+        legend.text = rownames(sepsis_aki_table))
+```
+Figure A1.This bar plot shows the distribution of patients who did and did not develop AKI, categorized by whether they had sepsis on admission. The number of patients with sepsis is small, but a higher proportion of them appear to have developed AKI compared to the patients without sepsis. This suggests that sepsis is a strong contributing factor to AKI, which is consistent with clinical knowledge. The limited number of sepsis cases, however, may affect the statistical power of any formal analysis.
+
+```{r}
+# Barplot: AKI vs Hypotension
+
+hypotension_aki_table <- table(data$`Hypotension (0 = no, 1 = yes)`,
+                               data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)`)
+
+barplot(hypotension_aki_table,
+        beside = TRUE,
+        col = c("lightyellow", "purple"),
+        main = "AKI by Hypotension Status",
+        ylab = "Count",
+        ylim=c(0,100),
+        legend.text = rownames(hypotension_aki_table))
+```
+
+Figure A2.Similar to the sepsis plot, this bar plot compares AKI incidence between patients with and without hypotension. The data suggests that hypotension, like sepsis, is a significant risk factor for AKI, as a larger proportion of patients with hypotension developed kidney injury. This finding aligns with the well-established clinical relationship between poor blood flow (hypotension) and renal hypoperfusion.
+
+```{r}
+# Histogram for Admission Serum Creatinine
+hist(data$`Admission Serum Creatinine (mg/dL)`,
+     main = "Admission Creatinine Distribution",
+     xlab = "Admission Serum Creatinine (mg/dL)",
+     ylab = "Count",
+     col = "lightgreen",
+     border = "black")
+```
+
+Figure A3:The histogram of admission creatinine levels shows a right-skewed distribution, indicating that most patients had creatinine values in the normal to low range (1.0-1.5 mg/dL). This is typical for diabetic ketoacidosis (DKA) patients. However, the presence of a long tail extending to high values (above 3.0 mg/dL) suggests that a small subset of patients had significantly elevated creatinine levels upon admission. This finding is critical because these patients likely had pre-existing kidney issues or severe illness, putting them at a higher risk for developing acute kidney injury (AKI) during their hospitalization. Therefore, admission creatinine is a vital predictor for AKI risk in this dataset.
+
+```{r}
+boxplot(data$`Admission Serum Creatinine (mg/dL)` ~ data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)`,
+        main = "Admission Creatinine by AKI Status",
+        xlab = "AKI Status",
+        ylab = "Admission Serum Creatinine (mg/dL)",
+        ylim=c(0,6),
+        col = c("lightgreen", "salmon"))
+```
+
+Figure A4.This boxplot visually confirms that patients who developed AKI during their hospitalization had a higher median admission serum creatinine than those who did not. The higher baseline creatinine level in the AKI group indicates that a degree of pre-existing kidney dysfunction or a higher degree of illness severity at the time of admission is a critical predictor for the development of AKI in DKA patients.
+
+
+```{r}
+boxplot(data$`APACHE II Score` ~ data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)`,
+        main = "APACHE II Score by AKI Status",
+        xlab = "AKI Status",
+        ylab = "APACHE II Score",
+        ylim=c(0,50),
+        col = c("lightblue", "orange"))
+```
+
+FigureA5:This boxplot shows the distribution of APACHE II scores, a measure of illness severity, for both groups. Patients who developed AKI have a significantly higher median APACHE II score. This supports the hypothesis that a higher burden of illness on admission is a key predictor of AKI risk, as reflected by the score's components, which include physiological and demographic data. This plot validates the use of the APACHE II score as a crucial variable in the predictive models for AKI.
+
+
+```{r}
+
+#Barplot: AKI vs Sepsis
+sepsis_aki_table <- table(data$`Sepsis (0 = no, 1 = yes)`,
+                          data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)`)
+barplot(sepsis_aki_table,
+        beside = TRUE,
+        col = c("lightgreen", "salmon"),
+        main = "AKI by Sepsis Status",
+        ylab = "Count",
+        ylim = c(0, 100),
+        legend.text = rownames(sepsis_aki_table))
+```
+
+Figure A6.Patients with sepsis have a substantially higher proportion of AKI compared to non-septic patients, despite their smaller numbers. This indicates that sepsis is an important risk factor for AKI in this DKA cohort.
+
+```{r}
+
+# Barplot: AKI vs Hypotension
+hypotension_aki_table <- table(data$`Hypotension (0 = no, 1 = yes)`,
+                               data$`Acute Kidney Injury In Hospital (0 = no, 1 yes)`)
+barplot(hypotension_aki_table,
+        beside = TRUE,
+        col = c("lightyellow", "purple"),
+        main = "AKI by Hypotension Status",
+        ylab = "Count",
+        ylim=c(0,100),
+        legend.text = rownames(hypotension_aki_table))
+
+```
+
+Figure A7. Patients who were hypotensive on admission show a markedly higher proportion of AKI than those without hypotension. This suggests that hypotension is a strong predictor of AKI development in this population.
+
+
+# Proposal 3
+
+#### Link to dataset: 
+
+Dataset Link - [Link](https://www.cbioportal.org/study/summary?id=brca_tcga_pan_can_atlas_2018)
+
+##### Download the data using the `original data` option that is available in the page. Shift the tar file to the data directory and unarchive the directory using the following command.
+
+cd data
+tar xvf brca_tcga_pan_can_atlas_2018.tar.gz
+
+
+# Appendix
+
+1. [Introduction](#introduction)
+2. [Dataset Justiification](#dataset-justification-2)
+3. [Research Question](#research-questions)
+4. [Data Wrangling](#data-wrangling-and-cleanup)
+5. [Exploratory Data Analysis](#exploratory-data-analysis-1)
+    - [Descriptive Statistics](#descriptive-statistics-1)
+    - [Data Visualization](#visualizations)
+6. [Planned Statistical Methods](#planned-statistical-methods-2)
+7. [Limitations](#limitations-2)
+8. [References](#references-1)
+
+# Introduction
+
+The Breast Invasive Carcinoma dataset from TCGA PanCancer Atlas (2018) contains clinical information for 1,084 patients with breast cancer. The dataset includes demographic details such as age, sex, race, and ethnicity; clinical features including tumor stage, lymph node status, and subtype; and outcome data such as overall survival, disease-free survival, and progression-free survival. It offers a well-documented, de-identified resource that can be used to explore associations between clinical features and patient outcomes.
+
+# Dataset Justification
+
+This dataset was selected because it meets the requirements for size, complexity, and biomedical relevance. With 38 variables and over 1,000 patients, it provides ample opportunities to apply descriptive statistics and visualization techniques. It includes both categorical and continuous variables, such as age, sex, subtype, and survival months. The dataset is ethically sourced and publicly available through cBioPortal, making it a strong candidate for meaningful analysis.
+
+
+# Research Questions
+
+1. What is the age distribution of breast cancer patients, and does it differ by molecular subtype?
+2. How do tumor stage and subtype relate to overall survival?
+3. Are there differences in overall survival between patients who received radiation therapy and those who did not?
+
+# Data Wrangling and Cleanup
+
+```{r}
+# Load dataset
+data <- read.delim("data/brca_tcga_pan_can_atlas_2018/data_clinical_patient.txt", comment.char="#", header=TRUE)
+
+# Inspect dataset
+dim(data)
+colnames(data)
+str(data)
+
+```
+
+```{r}
+# Convert categorical variables into factors
+data$SEX <- as.factor(data$SEX)
+data$SUBTYPE <- as.factor(data$SUBTYPE)
+data$AJCC_PATHOLOGIC_TUMOR_STAGE <- as.factor(data$AJCC_PATHOLOGIC_TUMOR_STAGE)
+data$RADIATION_THERAPY <- as.factor(data$RADIATION_THERAPY)
+data$OS_STATUS <- as.factor(data$OS_STATUS)
+
+# Check for missing values
+colSums(is.na(data))
+
+# Summary of numeric variables
+summary(data$AGE)
+summary(data$OS_MONTHS)
+
+```
+
+## Cleanup summary
+
+The dataset contains 1,084 patients and 38 variables. Some survival fields contain missing values (e.g., DFS months), but overall the dataset is well-structured. Categorical variables were converted to factors for analysis.
+
+
+# Exploratory Data Analysis
+## Descriptive Statistics
+```{r}
+# Age distribution
+summary(data$AGE)
+
+# Sex distribution
+table(data$SEX)
+
+# Subtype distribution
+table(data$SUBTYPE)
+
+# Tumor stage distribution
+table(data$AJCC_PATHOLOGIC_TUMOR_STAGE)
+
+# Overall survival
+summary(data$OS_MONTHS)
+table(data$OS_STATUS)
+```
+
+### Summary: 
+
+The median age at diagnosis was around 58 years, with patients ranging from 26 to 90 years.
+The majority of patients were female, with only a small number of males.
+The most common subtypes were Luminal A and Luminal B.
+Tumor stages varied, with many patients diagnosed at Stage II.
+Median overall survival was about 27 months, with survival times ranging up to nearly 283 months.
+
+
+## Visualizations
+```{r}
+hist(data$AGE,
+     main="Age Distribution of Patients",
+     xlab="Age at Diagnosis",
+     col="lightblue", border="black")
+
+```
+
+### Age by Subtype
+```{r}
+boxplot(AGE ~ SUBTYPE, data=data,
+        main="Age by Breast Cancer Subtype",
+        xlab="Subtype", ylab="Age",
+        col="pink", las=2)
+```
+
+### Survival by Tumor Stage
+
+```{r}
+boxplot(OS_MONTHS ~ AJCC_PATHOLOGIC_TUMOR_STAGE, data=data,
+        main="Overall Survival by Tumor Stage",
+        xlab="Tumor Stage", ylab="Overall Survival (Months)",
+        col="lightgreen", las=2)
+```
+
+### Age vs Overall Survival
+```{r}
+plot(data$AGE, data$OS_MONTHS,
+     main="Age vs Overall Survival",
+     xlab="Age", ylab="Overall Survival (Months)",
+     pch=16, col="blue")
+```
+
+
+# Planned Statistical Methods
+
+Planned analyses include chi-square tests to examine associations between categorical variables such as subtype and tumor stage, and t-tests to compare survival outcomes between groups such as radiation vs non-radiation patients. Correlation and regression methods may also be used to evaluate relationships between age and survival outcomes.
+
+
+# Limitations
+
+The dataset is cross-sectional and lacks detailed treatment history beyond radiation and neoadjuvant therapy. Some survival data are incomplete, particularly for disease-free and progression-free survival. The dataset is also biased toward female patients, with very few male cases available for comparison.
+
+# References
+
+Cerami, E., Gao, J., Dogrusoz, U., Gross, B. E., Sumer, S. O., Aksoy, B. A., Jacobsen, A., Byrne, C. J., Heuer, M. L., Larsson, E., Antipin, Y., Reva, B., Goldberg, A. P., Sander, C., & Schultz, N. (2012). The cBio cancer genomics portal: an open platform for exploring multidimensional cancer genomics data. Cancer discovery, 2(5), 401–404. https://doi.org/10.1158/2159-8290.CD-12-0095
